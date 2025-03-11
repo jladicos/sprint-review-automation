@@ -5,11 +5,11 @@
  * Updated to show which events would have triggers based on the composite key format.
  */
 function testFindSprintReviewEvents() {
-  // Configuration
-  const calendarId = 'primary'; // Use your calendar ID or 'primary' for main calendar
-  const exactSearchTerm = 'Sprint review'; // Exact text to match in event titles
-  const lookaheadDays = 90; // How many days ahead to look for events (increased for testing)
-  const daysInAdvance = 10; // When triggers would be set
+  // Use configuration from config.gs
+  const calendarId = CONFIG.calendar.id;
+  const exactSearchTerm = CONFIG.calendar.exactSearchTerm;
+  const lookaheadDays = CONFIG.calendar.lookaheadDays + 30; // Increased for testing (+30 days)
+  const daysInAdvance = CONFIG.calendar.daysInAdvance;
 
   // Calculate date range for searching events
   const now = new Date();
@@ -18,16 +18,35 @@ function testFindSprintReviewEvents() {
 
   // Get calendar and events
   const calendar = CalendarApp.getCalendarById(calendarId);
+
+  if (!calendar) {
+	Logger.log(`Error: Could not find calendar with ID: ${calendarId}`);
+	return; // Exit the function if calendar not found
+  }
+
+  Logger.log(`Successfully connected to calendar: ${calendar.getName()}`);
   const allEvents = calendar.getEvents(now, futureDate);
 
   // Filter for events with exactly matching titles
-  const events = allEvents.filter(event => event.getTitle().trim() === exactSearchTerm.trim());
+  const events = allEvents.filter(event => {
+	// Check that the event title matches
+	const titleMatches = event.getTitle().trim() === exactSearchTerm.trim();
+
+	// Check that the event is from our target calendar
+	const isFromTargetCalendar = event.getOriginalCalendarId() === calendar.getId();
+
+	// Only include events that match both conditions
+	return titleMatches && isFromTargetCalendar;
+  });
 
   // Get all properties to check for existing triggers
   const properties = PropertiesService.getScriptProperties().getProperties();
 
   // Prepare results for display
   Logger.log(`Found ${events.length} upcoming Sprint Review events in the next ${lookaheadDays} days:`);
+  Logger.log('-----------------------------------------------------');
+  Logger.log(`Calendar: ${calendarId}`);
+  Logger.log(`Search term: "${exactSearchTerm}"`);
   Logger.log('-----------------------------------------------------');
 
   // Display detailed information about each event

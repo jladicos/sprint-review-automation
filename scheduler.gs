@@ -3,11 +3,11 @@
  * Run this function monthly to maintain the scheduling.
  */
 function scheduleUpcomingSprintReviews() {
-  // Configuration
-  const calendarId = 'primary'; // Use your calendar ID or 'primary' for main calendar
-  const exactSearchTerm = 'Sprint review'; // Exact text to match in event titles
-  const daysInAdvance = 10; // Number of days before the event to create slides
-  const lookaheadDays = 60; // How many days ahead to look for events
+  // Use configuration from config.gs
+  const calendarId = CONFIG.calendar.id;
+  const exactSearchTerm = CONFIG.calendar.exactSearchTerm;
+  const daysInAdvance = CONFIG.calendar.daysInAdvance;
+  const lookaheadDays = CONFIG.calendar.lookaheadDays;
 
   // Calculate date range for searching events
   const now = new Date();
@@ -16,10 +16,26 @@ function scheduleUpcomingSprintReviews() {
 
   // Get calendar and events - we'll get all events and filter for exact matches
   const calendar = CalendarApp.getCalendarById(calendarId);
+
+  if (!calendar) {
+	Logger.log(`Error: Could not find calendar with ID: ${calendarId}`);
+	return; // Exit the function if calendar not found
+  }
+
+  Logger.log(`Successfully connected to calendar: ${calendar.getName()}`);
   const allEvents = calendar.getEvents(now, futureDate);
 
   // Filter for events with exactly matching titles
-  const events = allEvents.filter(event => event.getTitle().trim() === exactSearchTerm.trim());
+  const events = allEvents.filter(event => {
+	// Check that the event title matches
+	const titleMatches = event.getTitle().trim() === exactSearchTerm.trim();
+
+	// Check that the event is from our target calendar
+	const isFromTargetCalendar = event.getOriginalCalendarId() === calendar.getId();
+
+	// Only include events that match both conditions
+	return titleMatches && isFromTargetCalendar;
+  });
 
   Logger.log(`Found ${events.length} upcoming Sprint Review events in the next ${lookaheadDays} days`);
 
@@ -79,7 +95,7 @@ function scheduleUpcomingSprintReviews() {
 
 /**
  * Create a time-based trigger for a specific date
- * Modified to handle recurring events by including the event date in the key
+ * Modified to handle recurring events and prevent duplicate triggers across calendars
  */
 function createTimedTrigger(triggerDate, eventId, eventDate) {
   // Create a unique function name for this event
@@ -89,8 +105,16 @@ function createTimedTrigger(triggerDate, eventId, eventDate) {
   const dateString = Utilities.formatDate(eventDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const compositeKey = `TRIGGER_EVENT_${eventId}_${dateString}`;
 
+  // Create a date-only key to track all triggers by date
+  // This helps prevent duplicate triggers across calendars
+  const dateOnlyKey = `TRIGGER_DATE_${dateString}`;
+
   // Store the event ID and date in PropertiesService so we can retrieve it later
-  PropertiesService.getScriptProperties().setProperty(compositeKey, eventId);
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty(compositeKey, eventId);
+
+  // Also store a simpler date-based key to prevent duplicates across calendars
+  properties.setProperty(dateOnlyKey, "triggered");
 
   // Create the trigger
   ScriptApp.newTrigger(functionName)
@@ -101,7 +125,7 @@ function createTimedTrigger(triggerDate, eventId, eventDate) {
 
 /**
  * Check if a trigger already exists for this event instance
- * Modified to handle recurring events by including the event date in the key
+ * Modified to handle recurring events and prevent duplicate triggers across calendars
  */
 function checkExistingTrigger(eventId, eventDate) {
   // Create a key that includes both the event ID and the date
@@ -109,11 +133,20 @@ function checkExistingTrigger(eventId, eventDate) {
   const dateString = Utilities.formatDate(eventDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const compositeKey = `TRIGGER_EVENT_${eventId}_${dateString}`;
 
+  // Create a date-only key - used to check for duplicates across calendars
+  const dateOnlyKey = `TRIGGER_DATE_${dateString}`;
+
   // Get all properties
   const props = PropertiesService.getScriptProperties().getProperties();
 
-  // Check if this specific event instance exists in properties
-  return props[compositeKey] !== undefined;
+  // First, check if this specific event instance exists in properties
+  const specificTriggerExists = props[compositeKey] !== undefined;
+
+  // Next, check if any event on this same date already has a trigger
+  // This prevents duplicate triggers from different calendars
+  const dateHasTrigger = props[dateOnlyKey] !== undefined;
+
+  return specificTriggerExists || dateHasTrigger;
 }
 
 /**
@@ -151,9 +184,12 @@ function prepareSprintReviewSlides() {
 	ScriptApp.deleteTrigger(closestTrigger);
   }
 
-  // Now create the slide deck using today's date plus 10 days (since this should be 10 days before the event)
+  // Use the configured days in advance value
+  const daysInAdvance = CONFIG.calendar.daysInAdvance;
+
+  // Now create the slide deck using today's date plus days in advance
   const targetDate = new Date(now);
-  targetDate.setDate(targetDate.getDate() + 10); // Add 10 days to get the event date
+  targetDate.setDate(targetDate.getDate() + daysInAdvance);
 
   // Create the slide deck
   const slideUrl = createSprintReviewSlides(targetDate);

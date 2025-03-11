@@ -27,7 +27,7 @@ function completeReset() {
   let propCount = 0;
 
   for (const key in props) {
-	if (key.startsWith('TRIGGER_EVENT_')) {
+	if (key.startsWith('TRIGGER_EVENT_') || key.startsWith('TRIGGER_DATE_')) {
 	  properties.deleteProperty(key);
 	  propCount++;
 	  Logger.log(`Deleted property: ${key}`);
@@ -45,18 +45,28 @@ function completeReset() {
 
 /**
  * Lists all stored event properties without deleting them.
- * Updated to handle the new composite key format for recurring events.
+ * Updated to handle the new composite key format for recurring events and custom calendar.
  */
 function listStoredEventProperties() {
   const properties = PropertiesService.getScriptProperties();
   const props = properties.getProperties();
   let count = 0;
 
+  // Get the calendar using the ID from the config
+  const calendarId = CONFIG.calendar.id;
+  let calendar;
+  try {
+	calendar = CalendarApp.getCalendarById(calendarId);
+	Logger.log(`Using calendar: ${calendarId}`);
+  } catch (e) {
+	Logger.log(`Error accessing calendar: ${e.message}`);
+  }
+
   Logger.log('Currently stored event properties:');
   Logger.log('------------------------------------');
 
   for (const key in props) {
-	if (key.startsWith('TRIGGER_EVENT_')) {
+	if (key.startsWith('TRIGGER_EVENT_') || key.startsWith('TRIGGER_DATE_')) {
 	  count++;
 	  const eventId = props[key];
 	  Logger.log(`${count}. Property: ${key}`);
@@ -76,17 +86,42 @@ function listStoredEventProperties() {
 	  Logger.log(`   Event ID: ${eventId}`);
 	  Logger.log(`   Event Date: ${eventDate}`);
 
-	  // Try to get event details if possible
-	  try {
-		const event = CalendarApp.getEventById(eventId);
-		if (event) {
-		  Logger.log(`   Title: ${event.getTitle()}`);
-		  Logger.log(`   Actual Start Date: ${event.getStartTime().toDateString()}`);
-		} else {
-		  Logger.log(`   Event details not found (event may have been deleted)`);
+			// Try to get event details if possible
+	  if (calendar) {
+		try {
+		  // First try to find the event directly in our calendar
+		  let event = null;
+
+		  // We need to search through events around the stored date
+		  // Since we know the date from the key, we can search 24 hours around it
+		  if (eventDate !== "Unknown" && eventDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+			// Parse the date string into a Date object
+			const searchDate = new Date(eventDate + "T00:00:00");
+			const nextDay = new Date(searchDate);
+			nextDay.setDate(nextDay.getDate() + 1);
+
+			// Search for events in this 24-hour period
+			const possibleEvents = calendar.getEvents(searchDate, nextDay);
+
+			// Find the event with matching ID
+			event = possibleEvents.find(e => e.getId() === eventId);
+
+			if (event) {
+			  Logger.log(`   Title: ${event.getTitle()}`);
+			  Logger.log(`   Actual Start Date: ${event.getStartTime().toDateString()}`);
+			  Logger.log(`   Calendar: ${event.getOriginalCalendarId()}`);
+			} else {
+			  Logger.log(`   Event details not found in '${calendar.getName()}' calendar`);
+			  Logger.log(`   Event may have been deleted or moved to another calendar`);
+			}
+		  } else {
+			Logger.log(`   Cannot determine event date from key: ${key}`);
+		  }
+		} catch (e) {
+		  Logger.log(`   Cannot access event details: ${e.message}`);
 		}
-	  } catch (e) {
-		Logger.log(`   Cannot access event details: ${e.message}`);
+	  } else {
+		Logger.log(`   Cannot access event details: Calendar not available`);
 	  }
 
 	  Logger.log('------------------------------------');
