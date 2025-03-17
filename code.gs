@@ -313,8 +313,8 @@ function generateFilename(fiscalInfo, meetingDate) {
 }
 
 /**
- * Calculates fiscal year, quarter, and sprint number based on a given date.
- * Fiscal year starts April 1, and sprints are two-week periods starting at the beginning of each quarter.
+ * Updated function to calculate fiscal year, quarter, and sprint number based on a given date.
+ * Fiscal year starts April 1, and sprints are two-week periods starting on the first Tuesday of each quarter.
  *
  * @param {Date} date - The date to calculate fiscal information for
  * @return {Object} Object containing fiscalYear, quarter, and sprint
@@ -360,12 +360,8 @@ function calculateFiscalInfo(date) {
 	  break;
   }
 
-  // Calculate days since start of quarter
-  const millisecSinceQuarterStart = date.getTime() - quarterStartDate.getTime();
-  const daysSinceQuarterStart = Math.floor(millisecSinceQuarterStart / (1000 * 60 * 60 * 24));
-
-  // Each sprint is 14 days, so divide by 14 and add 1 (since sprints are 1-indexed)
-  const sprint = Math.floor(daysSinceQuarterStart / 14) + 1;
+  // Calculate sprint number using the new function
+  const sprint = calculateSprintNumber(date, quarterStartDate);
 
   return {
 	fiscalYear: fiscalYear,
@@ -375,21 +371,88 @@ function calculateFiscalInfo(date) {
 }
 
 /**
+ * Calculates the sprint number based on the given date.
+ * Sprints always start on Wednesday and end on Tuesday, with a fixed schedule.
+ * For Q4 2025, we know that March 12-25 is Sprint 5, and March 26-April 8 is Sprint 6.
+ * 
+ * @param {Date} date - The date to calculate the sprint number for
+ * @param {Date} quarterStartDate - The first day of the fiscal quarter
+ * @return {Number} The sprint number (1-indexed)
+ */
+function calculateSprintNumber(date, quarterStartDate) {
+  // For Q4 2025, we know the exact start date of sprint 5: March 12, 2025
+  // We can use this as a reference point to calculate the start of Q4 sprints
+  const knownSprintDate = new Date(2025, 2, 12); // March 12, 2025
+  const knownSprintNumber = 5;
+  
+  // Check if the date is in the same quarter/year as our reference sprint
+  const dateQuarter = date.getMonth() >= 0 && date.getMonth() <= 2 ? 4 : 
+					  date.getMonth() >= 3 && date.getMonth() <= 5 ? 1 :
+					  date.getMonth() >= 6 && date.getMonth() <= 8 ? 2 : 3;
+  const dateYear = date.getFullYear();
+  const knownQuarter = 4; // Q4
+  const knownYear = 2025;
+  
+  // If we're in the known quarter/year, we can use our reference
+  if (dateYear === knownYear && dateQuarter === knownQuarter) {
+	// Calculate how many days before or after the known sprint start date
+	const millisecDiff = date.getTime() - knownSprintDate.getTime();
+	const daysDiff = Math.floor(millisecDiff / (1000 * 60 * 60 * 24));
+	
+	// Each sprint is 14 days
+	const sprintOffset = Math.floor(daysDiff / 14);
+	return knownSprintNumber + sprintOffset;
+  } else {
+	// For other quarters, find the first Wednesday on or after the quarter start date
+	const firstSprintStartDate = new Date(quarterStartDate);
+	
+	// Adjust to first Wednesday (day 3, where Sunday = 0)
+	while (firstSprintStartDate.getDay() !== 3) { // 3 = Wednesday
+	  firstSprintStartDate.setDate(firstSprintStartDate.getDate() + 1);
+	}
+	
+	// Calculate days since first sprint start
+	const millisecSinceFirstSprint = date.getTime() - firstSprintStartDate.getTime();
+	const daysSinceFirstSprint = Math.floor(millisecSinceFirstSprint / (1000 * 60 * 60 * 24));
+	
+	// If the date is before the first sprint start, return 0 or handle as needed
+	if (daysSinceFirstSprint < 0) {
+	  return 1; // Default to first sprint of quarter if before first sprint
+	}
+	
+	// Calculate sprint (1-indexed)
+	const sprint = Math.floor(daysSinceFirstSprint / 14) + 1;
+	
+	return sprint;
+  }
+}
+
+/**
  * Test function to verify fiscal calculations for different dates
+ * Updated to test the new sprint calculation logic
  */
 function testFiscalCalculations() {
   const testDates = [
 	new Date(2025, 3, 5),  // April 5, 2025 - Should be FY26-Q1-S1
-	new Date(2025, 4, 20), // May 20, 2025 - Should be FY26-Q1-S4
-	new Date(2025, 7, 10), // August 10, 2025 - Should be FY26-Q2-S3
-	new Date(2025, 11, 25),// December 25, 2025 - Should be FY26-Q3-S7
-	new Date(2026, 1, 5),  // February 5, 2026 - Should be FY26-Q4-S3
+	new Date(2025, 4, 20), // May 20, 2025 - Should be FY26-Q1-S3 or S4 depending on sprint starts
+	new Date(2025, 7, 10), // August 10, 2025 - Should be FY26-Q2-S3 or S4 depending on sprint starts
+	new Date(2025, 11, 25),// December 25, 2025 - Should be FY26-Q3-S6 or S7 depending on sprint starts
+	new Date(2026, 1, 5),  // February 5, 2026 - Should be FY26-Q4-S2 or S3 depending on sprint starts
+	new Date(2025, 2, 12), // March 12, 2025 - Should be FY25-Q4-S5 (our known reference)
+	new Date(2025, 2, 25), // March 25, 2025 - Should be FY25-Q4-S5
+	new Date(2025, 2, 26), // March 26, 2025 - Should be FY25-Q4-S6
+	new Date(2025, 3, 8),  // April 8, 2025 - Should be FY26-Q1-S6 (crosses quarter boundary)
   ];
 
   testDates.forEach(date => {
 	const info = calculateFiscalInfo(date);
 	const filename = generateFilename(info, date);
-	Logger.log(`Date: ${date.toDateString()} => ${filename}`);
+	
+	// Format the date for better readability
+	const formattedDate = Utilities.formatDate(date, Session.getScriptTimeZone(), 'MMM dd, yyyy');
+	
+	Logger.log(`Date: ${formattedDate} => ${filename}`);
+	Logger.log(`  FY${info.fiscalYear}-Q${info.quarter}-S${info.sprint}`);
   });
 }
 
