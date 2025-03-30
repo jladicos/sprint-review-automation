@@ -1,3 +1,4 @@
+
 # Sprint Review Slide Deck Automation
 
 This project automates the creation of Sprint Review slide decks for recurring meetings using Google Apps Script. It automatically creates a copy of a template slide deck, updates the content with the correct sprint information and date, and moves it to a designated folder.
@@ -5,12 +6,13 @@ This project automates the creation of Sprint Review slide decks for recurring m
 ## Features
 
 - **Automated Slide Creation**: Creates slide decks 10 days before each Sprint Review meeting
-- **Custom File Naming**: Names files following the pattern "Sprint Review - FY26-Q1-S3-MMM DD"
+- **Custom File Naming**: Names files following the pattern "Sprint Review - FY26-Q1-S3-Apr 08"
 - **Slide Content Updates**: Automatically updates the first slide with correct sprint information and meeting date
 - **Calendar Integration**: Scans a dedicated Google Calendar for upcoming Sprint Review meetings
 - **Email Notifications**: Sends notifications when slides are created and when the scheduler runs
 - **Recurring Meeting Support**: Handles recurring calendar events properly
 - **Multi-Calendar Support**: Can be configured to use a specific calendar instead of your primary calendar
+- **One-Off Slide Creation**: Manually generate slide decks for arbitrary dates
 
 ## Setup Instructions
 
@@ -33,47 +35,44 @@ In the `config.gs` file, update the following:
 
 ```javascript
 const CONFIG = {
-  // Template slide deck ID
   templateId: 'YOUR_TEMPLATE_SLIDE_ID',
-
-  // Target folder ID where copies will be stored
   targetFolderId: 'YOUR_TARGET_FOLDER_ID',
-
-  // Calendar settings
   calendar: {
-	id: 'YOUR_CALENDAR_ID_OR_NAME',  // e.g., 'Product rituals' or the calendar ID
-	exactSearchTerm: 'Sprint review',  // Exact text to match in event titles
-	daysInAdvance: 10,  // Number of days before the event to create slides
-	lookaheadDays: 60   // How many days ahead to look for events
+    id: 'YOUR_CALENDAR_ID_OR_NAME',
+    exactSearchTerm: 'Sprint review',
+    daysInAdvance: 10,
+    lookaheadDays: 60
   }
 };
 ```
 
-To find these IDs:
-- For template ID: Open your template in Google Slides and look at the URL. The ID is the long string between `/d/` and `/edit`.
-- For folder ID: Open your destination folder in Google Drive and look at the URL. The ID is the string after `/folders/`.
-- For calendar ID:
-  - You can use the calendar name (e.g., 'Product rituals')
-  - For more reliability, use the calendar ID. Find it in Google Calendar by clicking on the three dots next to your calendar, selecting "Settings and sharing", and scrolling to "Integrate calendar" section to find the Calendar ID.
-
 ### Step 3: Set Up Automation
 
-Run these functions once to set up the automation:
+Run these functions:
 
-1. `completeReset()` - Clear any existing triggers (if needed)
-2. `testFindSprintReviewEvents()` - Verify your calendar events are being detected correctly
-3. `setupMonthlyScheduler()` - Create a monthly trigger to scan for upcoming meetings
-4. `scheduleUpcomingSprintReviews()` - Scan for upcoming meetings and set up initial triggers
+1. `completeReset()` - Clear all triggers and stored properties
+2. `testFindSprintReviewEvents()` - Verify your calendar events are being detected
+3. `scheduleUpcomingSprintReviews()` - Set up triggers for upcoming meetings
+4. `setupMonthlyScheduler()` - (Recommended) Keeps automation running for future meetings
 
 ### Step 4: Verify Setup
 
-1. Run `testFindSprintReviewEvents()` to check if your calendar events are being detected correctly
-2. Check the script logs to see what events were found and which calendar they're from
-3. You should receive an email notification after running `scheduleUpcomingSprintReviews()`
+1. Run `testFindSprintReviewEvents()`
+2. Check logs in Apps Script (`View > Logs`)
+3. You should receive email confirmation when slides are generated
 
 ## How It Works
 
-### Fiscal Year, Quarter, and Sprint Calculation
+### Sprint Identification Logic
+
+- Sprints are 2-week periods, starting on Jan 15, 2025
+- Sprint numbers are based on the **sprint start date**, not the meeting date
+- FY25 Q4 has unique logic:
+  - Sprint 1 starts Jan 15, 2025
+  - Sprint 6 ends April 8, 2025
+- Any date before Jan 15, 2025 → `FY00-Q0-S0`
+
+### Fiscal Year and Quarter Rules
 
 - Fiscal year starts on April 1
 - Quarters:
@@ -81,68 +80,97 @@ Run these functions once to set up the automation:
   - Q2: July to September
   - Q3: October to December
   - Q4: January to March
-- Sprints: 2-week periods starting at the beginning of each quarter
 
 ### Slide Deck Creation Process
 
-1. The scheduler runs monthly to find upcoming Sprint Review meetings in your configured calendar
-2. For each meeting, it schedules a trigger to run 10 days before the meeting
-3. When triggered, the script:
-   - Makes a copy of the template slide deck
-   - Renames it based on fiscal year, quarter, sprint, and date
-   - Moves it to the target folder
-   - Updates the first slide with sprint information and meeting date
-   - Sends an email notification with a link to the new slide deck
+1. Scheduler finds Sprint Review meetings
+2. Trigger is scheduled 10 days before each meeting
+3. On trigger:
+   - Copy slide template
+   - Rename using fiscal sprint string + date
+   - Update content on title slide
+   - Move slide to target folder
+   - Send notification email
 
-### Slide Content Updates
+## One-Off Slide Creation
 
-The script updates two elements on the first slide:
-1. Sprint information: Replaces "Sprint FYXX-QY-SZ" with the correct values
-2. Date: Replaces "Date: MMM DD, YYYY" with the actual meeting date
+You can manually generate a slide deck for any date by using the `testSlideCreation.gs` helper file.
 
-### Preventing Duplicate Triggers
+### Usage:
 
-The script uses two mechanisms to prevent duplicate triggers:
-1. Event-specific tracking: Uses the event ID and date to identify specific events
-2. Date-based tracking: Ensures only one trigger exists per date, preventing duplicates across calendars
+```javascript
+generateSprintReviewSlidesFor("2025-04-08");
+```
+
+This:
+- Parses the date
+- Generates a slide deck using all your configured logic
+- Applies the correct sprint label and file name
+- Works independently of scheduled events
+
+## Slide Content Updates
+
+- Replaces "Sprint FYXX-QY-SZ"
+- Replaces "Date: MMM DD, YYYY"
+
+## Preventing Duplicate Triggers
+
+- Uses event ID + date tracking
+- Ensures no duplicate date-based triggers
 
 ## Maintenance
 
-- The automation runs on Google's servers and will continue to work even when your computer is off
-- You'll receive email notifications when actions are taken
-- The monthly scheduler ensures that new meetings are detected as they're added to your calendar
-- If you move meetings to a different calendar, run `completeReset()` and then `scheduleUpcomingSprintReviews()` to update all triggers
+- Automation runs in Google Cloud (Apps Script)
+- Monthly scheduler ensures future meetings are detected
+- After any changes, run:
+  1. `completeReset()`
+  2. `scheduleUpcomingSprintReviews()`
+  3. `setupMonthlyScheduler()`
 
 ## Troubleshooting
 
-If slides aren't being created automatically:
+### If slides aren't being created:
 
-1. Check if the calendar events have the exact title "Sprint Review"
-2. Verify that you're using the correct calendar ID in the config.gs file
-3. Run `testFindSprintReviewEvents()` to check which events are being found and from which calendar
-4. Run `listStoredEventProperties()` to see which events have triggers set
-5. Run `listAllTriggers()` to see all active triggers
-6. Check `View > Logs` for error messages
-7. If needed, run `completeReset()` to clear everything and start fresh
+1. Confirm calendar event title is exactly "Sprint Review"
+2. Double-check `calendar.id` in `config.gs`
+3. Run `testFindSprintReviewEvents()` to verify detection
+4. Run `listStoredEventProperties()` to check stored events
+5. Run `listAllTriggers()` to view active triggers
+6. Use `View > Logs` in the Apps Script editor to inspect errors
+7. Re-run `completeReset()` if in doubt
+
+### Using the test functions:
+
+Use these utility/test functions to verify that everything is working:
+
+- `testFindSprintReviewEvents()` — Logs calendar events found using your config
+- `testSprintStringCalculations()` — Prints sprint string results for a list of example dates
+- `logSprintStringForDate(dateString)` — Logs the sprint string for any one date
+- `generateSprintReviewSlidesFor("YYYY-MM-DD")` — One-off deck generation for any date
+- `listAllTriggers()` — Outputs currently active time and event-based triggers
+- `listStoredEventProperties()` — Lists stored properties used to prevent duplication
 
 ## Function Reference
 
-- `createSprintReviewSlides(date)` - Creates a slide deck for a specific date
-- `scheduleUpcomingSprintReviews()` - Scans calendar and sets up triggers
-- `setupMonthlyScheduler()` - Creates monthly trigger for the scheduler
-- `completeReset()` - Clears all triggers and stored properties
-- `testFindSprintReviewEvents()` - Tests calendar event detection without creating triggers
-- `listStoredEventProperties()` - Shows tracked events and attempts to find them in the configured calendar
-- `listAllTriggers()` - Shows all active triggers
+- `formatSprintString(date)` - Converts any date to a fiscal sprint string (e.g. FY25-Q4-S6)
+- `createSprintReviewSlides(date)` - Generates slide deck with correct content and name
+- `scheduleUpcomingSprintReviews()` - Sets up slide generation triggers for future meetings
+- `setupMonthlyScheduler()` - Ensures automation continues running
+- `completeReset()` - Clears all existing triggers and stored metadata
+- `testFindSprintReviewEvents()` - Lists matching calendar events
+- `generateSprintReviewSlidesFor(dateString)` - Manually generate slides from a date string
+- `listStoredEventProperties()` - Displays tracked events
+- `listAllTriggers()` - Lists all triggers for debugging
 
 ## Switching Calendars
 
-If you need to move your Sprint Review events to a different calendar:
+If you change to a different calendar:
 
-1. Update the `calendar.id` in the `config.gs` file
-2. Run `completeReset()` to clear all existing triggers
-3. Run `testFindSprintReviewEvents()` to verify events are found in the new calendar
-4. Run `scheduleUpcomingSprintReviews()` to set up new triggers
+1. Update `calendar.id` in `config.gs`
+2. Run `completeReset()`
+3. Run `testFindSprintReviewEvents()` to validate
+4. Run `scheduleUpcomingSprintReviews()`
+5. Run `setupMonthlyScheduler()` to restore monthly updates
 
 ## License
 
