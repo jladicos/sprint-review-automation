@@ -12,7 +12,7 @@ This project automates the creation of Sprint Review slide decks for recurring m
 - **Email Notifications**: Sends notifications when slides are created and when the scheduler runs
 - **Recurring Meeting Support**: Handles recurring calendar events properly
 - **Multi-Calendar Support**: Can be configured to use a specific calendar instead of your primary calendar
-- **One-Off Slide Creation**: Manually generate slide decks for arbitrary dates
+- **Manual Slide Creation Support**: Generate slides for any arbitrary date and/or sprint label
 
 ## Setup Instructions
 
@@ -92,21 +92,40 @@ Run these functions:
    - Move slide to target folder
    - Send notification email
 
-## One-Off Slide Creation
+## Manual Slide Creation (via testSlideCreation.gs)
 
-You can manually generate a slide deck for any date by using the `testSlideCreation.gs` helper file.
+Use `testSlideCreation.gs` for one-off or custom Sprint Review slide generation.
 
-### Usage:
+### Generate a slide based on date:
 
 ```javascript
 generateSprintReviewSlidesFor("2025-04-08");
 ```
 
 This:
-- Parses the date
-- Generates a slide deck using all your configured logic
-- Applies the correct sprint label and file name
-- Works independently of scheduled events
+- Calculates the correct sprint label based on the sprint start date
+- Creates the deck using standard logic
+
+### Generate a slide with a custom sprint label:
+
+```javascript
+generateCustomSprintReviewSlides("2025-07-03", "FY26-Q1-S5");
+```
+
+Use this when:
+- The meeting doesn't fall on a normal cadence (e.g. due to holidays)
+- You want to override the sprint number manually
+
+### Quick-access helpers:
+
+If you added your own wrappers like:
+
+```javascript
+function runManualTestFor(date) { ... }
+function runCustomSprintTestFor(date, label) { ... }
+```
+
+You can run these from the script menu or console without typing parameters repeatedly.
 
 ## Slide Content Updates
 
@@ -141,24 +160,25 @@ This:
 
 ### Using the test functions:
 
-Use these utility/test functions to verify that everything is working:
-
 - `testFindSprintReviewEvents()` — Logs calendar events found using your config
 - `testSprintStringCalculations()` — Prints sprint string results for a list of example dates
 - `logSprintStringForDate(dateString)` — Logs the sprint string for any one date
-- `generateSprintReviewSlidesFor("YYYY-MM-DD")` — One-off deck generation for any date
+- `generateSprintReviewSlidesFor("YYYY-MM-DD")` — One-off deck generation using calculated sprint info
+- `generateCustomSprintReviewSlides("YYYY-MM-DD", "SPRINT_LABEL")` — Force create slide for any label/date combo
 - `listAllTriggers()` — Outputs currently active time and event-based triggers
 - `listStoredEventProperties()` — Lists stored properties used to prevent duplication
 
 ## Function Reference
 
 - `formatSprintString(date)` - Converts any date to a fiscal sprint string (e.g. FY25-Q4-S6)
-- `createSprintReviewSlides(date)` - Generates slide deck with correct content and name
+- `createSprintReviewSlides(date)` - Automatically calculates sprint label and creates slide deck
+- `createSlides(date, sprintLabel)` - Shared logic to build a slide deck for any given date and sprint label
 - `scheduleUpcomingSprintReviews()` - Sets up slide generation triggers for future meetings
 - `setupMonthlyScheduler()` - Ensures automation continues running
 - `completeReset()` - Clears all existing triggers and stored metadata
 - `testFindSprintReviewEvents()` - Lists matching calendar events
 - `generateSprintReviewSlidesFor(dateString)` - Manually generate slides from a date string
+- `generateCustomSprintReviewSlides(dateString, sprintLabel)` - Manually generate slides from date + sprint string
 - `listStoredEventProperties()` - Displays tracked events
 - `listAllTriggers()` - Lists all triggers for debugging
 
