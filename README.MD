@@ -1,4 +1,3 @@
-
 # Sprint Review Slide Deck Automation
 
 This project automates the creation of Sprint Review slide decks for recurring meetings using Google Apps Script. It automatically creates a copy of a template slide deck, updates the content with the correct sprint information and date, and moves it to a designated folder.
@@ -13,6 +12,7 @@ This project automates the creation of Sprint Review slide decks for recurring m
 - **Recurring Meeting Support**: Handles recurring calendar events properly
 - **Multi-Calendar Support**: Can be configured to use a specific calendar instead of your primary calendar
 - **Manual Slide Creation Support**: Generate slides for any arbitrary date and/or sprint label
+- **Messaging System**: Uses a modular messaging library for notifications (emails, with Slack support possible in the future)
 
 ## Setup Instructions
 
@@ -22,6 +22,7 @@ This project automates the creation of Sprint Review slide decks for recurring m
 - A template slide deck in Google Slides
 - A dedicated Google Calendar for product team rituals (recommended)
 - Sprint Review meetings in your calendar (must have exact title "Sprint Review")
+- The MessagingUtils library (see MessagingUtils Library section below)
 
 ### Step 1: Create the Script Project
 
@@ -116,16 +117,46 @@ Use this when:
 - The meeting doesn't fall on a normal cadence (e.g. due to holidays)
 - You want to override the sprint number manually
 
-### Quick-access helpers:
+## MessagingUtils Library
 
-If you added your own wrappers like:
+This project uses a modular MessagingUtils library for handling notifications.
 
-```javascript
-function runManualTestFor(date) { ... }
-function runCustomSprintTestFor(date, label) { ... }
-```
+### Library Features
 
-You can run these from the script menu or console without typing parameters repeatedly.
+- **Unified Messaging Interface**: Common interface for sending different types of messages
+- **Templated Notifications**: Uses templates for consistent email formatting
+- **Auto-initialization**: No need to call initialization functions manually
+- **Extensible**: Designed to support additional messaging platforms (like Slack) in the future
+
+### Setting Up the Library
+
+1. Create the MessagingUtils library:
+   - Create a new Apps Script project
+   - Add the MessagingUtils code
+   - Deploy as a library (Project Settings > Library)
+   - Copy the Library ID and current version number
+
+2. Add the library to this project:
+   - In the Editor sidebar, click Libraries (+)
+   - Enter the Library ID from step 1
+   - Select the latest version
+   - Set Identifier as "MsgUtils"
+   - Click Add
+
+### Testing Notifications
+
+After setting up the library, use `testNotifications.gs` to verify it's working:
+
+- `testSlideCreationNotification()` - Tests slide creation email
+- `testSchedulerNotification()` - Tests scheduler status email
+- `testAllNotifications()` - Tests all notification types at once
+
+### How Notifications Work
+
+The project uses three components for messaging:
+1. **MsgUtils Library**: Core messaging functionality
+2. **SprintEmailTemplates**: Project-specific email templates
+3. **SprintMessaging**: Auto-initializing wrapper that connects the two
 
 ## Slide Content Updates
 
@@ -157,6 +188,7 @@ You can run these from the script menu or console without typing parameters repe
 5. Run `listAllTriggers()` to view active triggers
 6. Use `View > Logs` in the Apps Script editor to inspect errors
 7. Re-run `completeReset()` if in doubt
+8. Try `testAllNotifications()` to check if email notifications are working
 
 ### Using the test functions:
 
@@ -167,6 +199,9 @@ You can run these from the script menu or console without typing parameters repe
 - `generateCustomSprintReviewSlides("YYYY-MM-DD", "SPRINT_LABEL")` — Force create slide for any label/date combo
 - `listAllTriggers()` — Outputs currently active time and event-based triggers
 - `listStoredEventProperties()` — Lists stored properties used to prevent duplication
+- `testAllNotifications()` — Tests all notification types at once
+- `testSlideCreationNotification()` — Tests just the slide creation email
+- `testSchedulerNotification()` — Tests just the scheduler notification email
 
 ## Function Reference
 
@@ -181,6 +216,8 @@ You can run these from the script menu or console without typing parameters repe
 - `generateCustomSprintReviewSlides(dateString, sprintLabel)` - Manually generate slides from date + sprint string
 - `listStoredEventProperties()` - Displays tracked events
 - `listAllTriggers()` - Lists all triggers for debugging
+- `sendNotificationEmail(slideUrl, meetingDate)` - Sends notification about created slides
+- `sendSchedulerNotificationEmail(nextMeetingDate, scheduledDates, triggersCreated)` - Sends scheduler notification
 
 ## Switching Calendars
 
