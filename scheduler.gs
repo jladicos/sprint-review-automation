@@ -55,8 +55,9 @@ const SprintMessaging = (function() {
 /**
  * Finds upcoming Sprint Review meetings and schedules slide creation 10 days before each one.
  * Run this function monthly to maintain the scheduling.
+ * @param {boolean} debugMode - If true, suppresses email notifications for testing (default: false)
  */
-function scheduleUpcomingSprintReviews() {
+function scheduleUpcomingSprintReviews(debugMode = false) {
   // Use configuration from config.gs
   const calendarId = CONFIG.calendar.id;
   const exactSearchTerm = CONFIG.calendar.exactSearchTerm;
@@ -144,7 +145,7 @@ function scheduleUpcomingSprintReviews() {
   Logger.log(`Created ${triggersCreated} new triggers for upcoming meetings`);
 
   // Send notification email with the results
-  sendSchedulerNotificationEmail(nextMeetingDate, scheduledDates, triggersCreated);
+  sendSchedulerNotificationEmail(nextMeetingDate, scheduledDates, triggersCreated, debugMode);
 }
 
 /**
@@ -197,39 +198,107 @@ function prepareSprintReviewSlides() {
   // Send an email notification
   sendNotificationEmail(slideUrl, targetDate);
 
-  // After creating for one meeting, check for future meetings and update triggers
-  scheduleUpcomingSprintReviews();
+  // Note: Removed recursive call to scheduleUpcomingSprintReviews() to prevent duplicate triggers
+  // The system is self-sustaining through bi-weekly execution without this call
 }
 
 /**
  * Sends an email notification with the slide deck URL after slides are prepared
+ * @param {string} slideUrl - URL of the created slide deck
+ * @param {Date} meetingDate - Date of the Sprint Review meeting
+ * @param {boolean} debugMode - If true, suppresses email sending for testing (default: false)
  */
-function sendNotificationEmail(slideUrl, meetingDate) {
+function sendNotificationEmail(slideUrl, meetingDate, debugMode = false) {
+  if (debugMode) {
+    Logger.log('DEBUG MODE: Slide creation notification email suppressed for testing');
+    Logger.log(`Would have sent email about slide deck: ${slideUrl}`);
+    return;
+  }
+
   const recipient = Session.getActiveUser().getEmail();
   const sprintLabel = formatSprintString(meetingDate);
-  
+
   SprintMessaging.sendSlideCreationNotification(
-    recipient, 
-    slideUrl, 
-    meetingDate, 
+    recipient,
+    slideUrl,
+    meetingDate,
     sprintLabel
   );
-  
+
   Logger.log('Notification email sent');
 }
 
 /**
  * Sends a notification email about scheduled triggers
+ * @param {Date} nextMeetingDate - The next upcoming meeting date
+ * @param {Array} scheduledDates - Array of formatted dates that were scheduled
+ * @param {number} triggersCreated - Number of triggers created
+ * @param {boolean} debugMode - If true, suppresses email sending for testing (default: false)
  */
-function sendSchedulerNotificationEmail(nextMeetingDate, scheduledDates, triggersCreated) {
+function sendSchedulerNotificationEmail(nextMeetingDate, scheduledDates, triggersCreated, debugMode = false) {
+  if (debugMode) {
+    Logger.log('DEBUG MODE: Scheduler notification email suppressed for testing');
+    Logger.log(`Would have sent email about ${triggersCreated} triggers for ${scheduledDates.length} meetings`);
+    return;
+  }
+
   const recipient = Session.getActiveUser().getEmail();
-  
+
   SprintMessaging.sendSchedulerNotification(
     recipient,
     nextMeetingDate,
     scheduledDates,
     triggersCreated
   );
-  
+
   Logger.log('Notification email sent');
+}
+
+/**
+ * Checks if a trigger already exists for a specific event and date combination.
+ * Uses a composite key approach to handle recurring events properly.
+ *
+ * @param {string} eventId - The Google Calendar event ID
+ * @param {Date} eventDate - The date of the specific event occurrence
+ * @returns {boolean} - True if a trigger already exists for this event+date combination
+ */
+function checkExistingTrigger(eventId, eventDate) {
+  // Create composite key using event ID and date
+  const dateString = Utilities.formatDate(eventDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const compositeKey = `TRIGGER_EVENT_${eventId}_${dateString}`;
+
+  // Check if we have a stored property for this specific event occurrence
+  const properties = PropertiesService.getScriptProperties();
+  const existingTrigger = properties.getProperty(compositeKey);
+
+  if (existingTrigger) {
+    Logger.log(`Existing trigger found for event ${eventId} on ${dateString}`);
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Creates a timed trigger for slide preparation and stores tracking information.
+ *
+ * @param {Date} targetDate - The date when the trigger should fire (10 days before meeting)
+ * @param {string} eventId - The Google Calendar event ID
+ * @param {Date} eventDate - The date of the actual meeting
+ */
+function createTimedTrigger(targetDate, eventId, eventDate) {
+  // Create the actual Google Apps Script trigger
+  const trigger = ScriptApp.newTrigger('prepareSprintReviewSlides')
+    .timeBased()
+    .at(targetDate)
+    .create();
+
+  // Store the trigger information using composite key
+  const dateString = Utilities.formatDate(eventDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const compositeKey = `TRIGGER_EVENT_${eventId}_${dateString}`;
+
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty(compositeKey, eventId);
+
+  Logger.log(`Created trigger ${trigger.getUniqueId()} for event ${eventId} on ${dateString}, firing on ${targetDate.toDateString()}`);
 }

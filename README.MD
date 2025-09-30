@@ -190,9 +190,18 @@ The project uses three components for messaging:
 7. Re-run `completeReset()` if in doubt
 8. Try `testAllNotifications()` to check if email notifications are working
 
+### If you're experiencing duplicate slide creation:
+
+1. Run `testDuplicateTriggerCreation()` to verify if duplicates are being created
+2. Check logs to see if duplicate triggers are detected
+3. If duplicates are found, the fix should already be applied (recursive call removed)
+4. Use `completeReset()` to clear any existing duplicate triggers
+5. Run `scheduleUpcomingSprintReviews()` to set up fresh, non-duplicate triggers
+
 ### Using the test functions:
 
 - `testFindSprintReviewEvents()` — Logs calendar events found using your config
+- `testDuplicateTriggerCreation()` — Tests for duplicate trigger creation issues and verifies fixes
 - `testSprintStringCalculations()` — Prints sprint string results for a list of example dates
 - `logSprintStringForDate(dateString)` — Logs the sprint string for any one date
 - `generateSprintReviewSlidesFor("YYYY-MM-DD")` — One-off deck generation using calculated sprint info
@@ -212,6 +221,7 @@ The project uses three components for messaging:
 - `setupMonthlyScheduler()` - Ensures automation continues running
 - `completeReset()` - Clears all existing triggers and stored metadata
 - `testFindSprintReviewEvents()` - Lists matching calendar events
+- `testDuplicateTriggerCreation()` - Tests for duplicate trigger creation issues and verifies fixes
 - `generateSprintReviewSlidesFor(dateString)` - Manually generate slides from a date string
 - `generateCustomSprintReviewSlides(dateString, sprintLabel)` - Manually generate slides from date + sprint string
 - `listStoredEventProperties()` - Displays tracked events

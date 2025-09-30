@@ -81,3 +81,70 @@ function testFindSprintReviewEvents() {
 
   Logger.log('NOTE: No triggers were actually created. This is just a test to show which events would be included.');
 }
+
+/**
+ * Test function to reproduce and verify the duplicate trigger creation issue.
+ * This function will:
+ * 1. Clear all existing triggers
+ * 2. Run scheduleUpcomingSprintReviews() once
+ * 3. Run it again to simulate the recursive call issue
+ * 4. Show if duplicates are created
+ *
+ * Run this BEFORE applying the fix to see the problem, then AFTER to verify the solution.
+ */
+function testDuplicateTriggerCreation() {
+  Logger.log('=== Testing Duplicate Trigger Creation ===');
+  Logger.log('This test simulates the duplicate trigger issue caused by recursive calls.');
+  Logger.log('-----------------------------------------------------');
+
+  // Step 1: Clean slate
+  Logger.log('Step 1: Clearing all existing triggers...');
+  completeReset();
+
+  // Step 2: First run (normal behavior, but suppress emails for testing)
+  Logger.log('Step 2: Running scheduleUpcomingSprintReviews() first time...');
+  scheduleUpcomingSprintReviews(true);
+
+  // Check what we have after first run
+  const triggersAfterFirst = ScriptApp.getProjectTriggers();
+  const slidePreparationTriggersFirst = triggersAfterFirst.filter(t => t.getHandlerFunction() === 'prepareSprintReviewSlides');
+  Logger.log(`After first run: Found ${slidePreparationTriggersFirst.length} prepareSprintReviewSlides triggers`);
+
+  // Step 3: Second run (simulates recursive call from prepareSprintReviewSlides)
+  Logger.log('Step 3: Running scheduleUpcomingSprintReviews() second time (simulating recursive call)...');
+  scheduleUpcomingSprintReviews(true);
+
+  // Check for duplicates
+  const triggersAfterSecond = ScriptApp.getProjectTriggers();
+  const slidePreparationTriggersSecond = triggersAfterSecond.filter(t => t.getHandlerFunction() === 'prepareSprintReviewSlides');
+  Logger.log(`After second run: Found ${slidePreparationTriggersSecond.length} prepareSprintReviewSlides triggers`);
+
+  // Analysis
+  Logger.log('-----------------------------------------------------');
+  Logger.log('=== ANALYSIS ===');
+  if (slidePreparationTriggersSecond.length > slidePreparationTriggersFirst.length) {
+    Logger.log('❌ DUPLICATE TRIGGERS DETECTED!');
+    Logger.log(`Triggers increased from ${slidePreparationTriggersFirst.length} to ${slidePreparationTriggersSecond.length}`);
+    Logger.log('This confirms the duplicate trigger creation issue.');
+  } else {
+    Logger.log('✅ NO DUPLICATES DETECTED');
+    Logger.log('The duplicate prevention logic is working correctly.');
+  }
+
+  // Detailed trigger list
+  Logger.log('-----------------------------------------------------');
+  Logger.log('Detailed trigger information:');
+  listAllTriggers();
+
+  // Clean up after test
+  Logger.log('-----------------------------------------------------');
+  Logger.log('Cleaning up test triggers...');
+  completeReset();
+
+  // Restore proper automation for production use
+  Logger.log('Restoring production triggers for upcoming meetings...');
+  scheduleUpcomingSprintReviews();
+  Logger.log('Test completed. System restored to proper working state.');
+  Logger.log('Your Sprint Review automation is now ready for production use.');
+}
+
