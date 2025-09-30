@@ -112,10 +112,6 @@ function scheduleUpcomingSprintReviews(debugMode = false) {
       nextMeetingDate = eventDate;
     }
 
-    // Format date for display in email
-    const formattedEventDate = Utilities.formatDate(eventDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy');
-    scheduledDates.push(formattedEventDate);
-
     // Calculate the target date (10 days before the event)
     const targetDate = new Date(eventDate);
     targetDate.setDate(targetDate.getDate() - daysInAdvance);
@@ -132,6 +128,10 @@ function scheduleUpcomingSprintReviews(debugMode = false) {
         // Pass the event date as well
         createTimedTrigger(targetDate, eventId, eventDate);
         triggersCreated++;
+
+        // Only add to scheduled dates if we actually created a trigger
+        const formattedEventDate = Utilities.formatDate(eventDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy');
+        scheduledDates.push(formattedEventDate);
 
         Logger.log(`Scheduled slide creation for "${eventTitle}" on ${targetDate.toDateString()}`);
       } else {
