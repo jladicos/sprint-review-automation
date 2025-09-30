@@ -136,119 +136,34 @@ function listStoredEventProperties() {
 }
 
 /**
- * Lists all active triggers in the project with comprehensive debugging information.
- * Shows meeting details, trigger fire dates, and calendar event correlation.
+ * Lists all active triggers in the project without deleting them.
+ * Useful for seeing what triggers are actually scheduled.
  */
 function listAllTriggers() {
   const allTriggers = ScriptApp.getProjectTriggers();
-  const properties = PropertiesService.getScriptProperties().getProperties();
-
-  // Build a map of stored event info from properties
-  const eventMap = {};
-  for (const key in properties) {
-    if (key.startsWith('TRIGGER_EVENT_')) {
-      // Extract date and event ID from key: TRIGGER_EVENT_eventId_2025-04-08
-      const parts = key.split('_');
-      const dateStr = parts[parts.length - 1]; // Last part is date
-      const eventId = properties[key];
-      eventMap[eventId] = {
-        meetingDate: dateStr,
-        propertyKey: key,
-        eventId: eventId
-      };
-    }
-  }
-
-  // Get calendar for event lookups
-  let calendar;
-  try {
-    calendar = CalendarApp.getCalendarById(CONFIG.calendar.id);
-  } catch (e) {
-    Logger.log(`Warning: Could not access calendar ${CONFIG.calendar.id}: ${e.message}`);
-  }
-
-  Logger.log('Currently active triggers with detailed information:');
-  Logger.log('================================================================');
-
   let count = 0;
+
+  Logger.log('Currently active triggers:');
+  Logger.log('------------------------------------');
+
   allTriggers.forEach(trigger => {
     count++;
-    Logger.log(`${count}. Trigger ID: ${trigger.getUniqueId()}`);
-    Logger.log(`   Function: ${trigger.getHandlerFunction()}`);
+    Logger.log(`${count}. Function: ${trigger.getHandlerFunction()}`);
     Logger.log(`   Event Type: ${trigger.getEventType()}`);
+    Logger.log(`   Trigger ID: ${trigger.getUniqueId()}`);
 
     if (trigger.getEventType() === ScriptApp.EventType.CLOCK) {
-      // Try to find corresponding event information
-      let eventInfo = null;
-      let calendarEvent = null;
-
-      // Look through our stored events to find a match
-      for (const eventId in eventMap) {
-        const stored = eventMap[eventId];
-
-        // Try to get the calendar event
-        if (calendar) {
-          try {
-            // We need to search for the event since getEventById might not work with recurring events
-            const meetingDate = new Date(stored.meetingDate + "T00:00:00");
-            const nextDay = new Date(meetingDate);
-            nextDay.setDate(nextDay.getDate() + 1);
-
-            const possibleEvents = calendar.getEvents(meetingDate, nextDay);
-            calendarEvent = possibleEvents.find(e => e.getId() === eventId);
-
-            if (calendarEvent) {
-              eventInfo = stored;
-              break; // Found a match
-            }
-          } catch (e) {
-            Logger.log(`   Warning: Could not access event ${eventId}: ${e.message}`);
-          }
-        }
-      }
-
-      if (eventInfo && calendarEvent) {
-        // Calculate trigger fire date (meeting date - daysInAdvance)
-        const meetingDate = calendarEvent.getStartTime();
-        const triggerDate = new Date(meetingDate);
-        triggerDate.setDate(triggerDate.getDate() - CONFIG.calendar.daysInAdvance);
-
-        Logger.log(`   Meeting: "${calendarEvent.getTitle()}" on ${Utilities.formatDate(meetingDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy h:mm a')}`);
-        Logger.log(`   Trigger fires: ${Utilities.formatDate(triggerDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy')} (${CONFIG.calendar.daysInAdvance} days before)`);
-        Logger.log(`   Event ID: ${eventInfo.eventId}`);
-        Logger.log(`   Calendar: ${calendarEvent.getOriginalCalendarId()}`);
-        Logger.log(`   Stored Property: ${eventInfo.propertyKey}`);
-
-        if (calendarEvent.getLocation()) {
-          Logger.log(`   Location: ${calendarEvent.getLocation()}`);
-        }
-      } else {
-        // Couldn't correlate with stored events
-        Logger.log(`   Unable to correlate with calendar event`);
+      if (trigger.getTriggerSourceId()) {
         Logger.log(`   Source ID: ${trigger.getTriggerSourceId()}`);
-        Logger.log(`   Note: This trigger may be orphaned or from a different system`);
       }
-    } else {
-      Logger.log(`   Non-clock trigger: ${trigger.getTriggerSource()}`);
     }
 
-    Logger.log('================================================================');
+    Logger.log('------------------------------------');
   });
 
   if (count === 0) {
     Logger.log('No active triggers found');
   } else {
-    Logger.log(`Found ${count} active triggers total`);
-
-    // Summary of stored events vs active triggers
-    const storedEventCount = Object.keys(eventMap).length;
-    const clockTriggerCount = allTriggers.filter(t => t.getEventType() === ScriptApp.EventType.CLOCK).length;
-
-    Logger.log(`Stored event properties: ${storedEventCount}`);
-    Logger.log(`Clock-based triggers: ${clockTriggerCount}`);
-
-    if (storedEventCount !== clockTriggerCount) {
-      Logger.log(`⚠️  MISMATCH: ${storedEventCount} stored events vs ${clockTriggerCount} clock triggers`);
-    }
+    Logger.log(`Found ${count} active triggers`);
   }
 }
