@@ -190,18 +190,17 @@ The project uses three components for messaging:
 7. Re-run `completeReset()` if in doubt
 8. Try `testAllNotifications()` to check if email notifications are working
 
-### If you're experiencing duplicate slide creation:
+### Testing the system:
 
-1. Run `testDuplicateTriggerCreation()` to verify if duplicates are being created
-2. Check logs to see if duplicate triggers are detected
-3. If duplicates are found, the fix should already be applied (recursive call removed)
-4. Use `completeReset()` to clear any existing duplicate triggers
-5. Run `scheduleUpcomingSprintReviews()` to set up fresh, non-duplicate triggers
+1. Run `testDuplicateTriggerCreation()` to verify trigger creation and duplicate prevention
+2. This test automatically cleans up and restores proper triggers when complete
+3. Use `listAllTriggers()` to see current trigger status with IDs
+4. Use `listStoredEventProperties()` to see tracked events
 
 ### Using the test functions:
 
 - `testFindSprintReviewEvents()` — Logs calendar events found using your config
-- `testDuplicateTriggerCreation()` — Tests for duplicate trigger creation issues and verifies fixes
+- `testDuplicateTriggerCreation()` — Tests trigger creation and duplicate prevention system (suppresses emails, auto-restores)
 - `testSprintStringCalculations()` — Prints sprint string results for a list of example dates
 - `logSprintStringForDate(dateString)` — Logs the sprint string for any one date
 - `generateSprintReviewSlidesFor("YYYY-MM-DD")` — One-off deck generation using calculated sprint info
@@ -221,7 +220,7 @@ The project uses three components for messaging:
 - `setupMonthlyScheduler()` - Ensures automation continues running
 - `completeReset()` - Clears all existing triggers and stored metadata
 - `testFindSprintReviewEvents()` - Lists matching calendar events
-- `testDuplicateTriggerCreation()` - Tests for duplicate trigger creation issues and verifies fixes
+- `testDuplicateTriggerCreation()` - Tests trigger creation and duplicate prevention system
 - `generateSprintReviewSlidesFor(dateString)` - Manually generate slides from a date string
 - `generateCustomSprintReviewSlides(dateString, sprintLabel)` - Manually generate slides from date + sprint string
 - `listStoredEventProperties()` - Displays tracked events
